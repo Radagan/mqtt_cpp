@@ -8432,11 +8432,12 @@ private:
     }
 
     // primitive read functions
+    template <typename Handler>
     void process_nbytes(
         async_handler_t func,
         buffer buf,
         std::size_t size,
-        std::function<void(buffer, buffer, async_handler_t)> handler) {
+        Handler handler) {
         if (remaining_length_ < size) {
             call_message_size_error_handlers(func);
             return;
@@ -8495,11 +8496,11 @@ private:
         }
     }
 
-    template <std::size_t Bytes>
+    template <std::size_t Bytes, typename Handler>
     void process_fixed_length(
         async_handler_t func,
         buffer buf,
-        std::function<void(std::size_t, buffer, async_handler_t)> handler) {
+        Handler handler) {
         if (remaining_length_ < Bytes) {
             call_message_size_error_handlers(func);
             return;
@@ -8548,10 +8549,11 @@ private:
     }
 
     // This function isn't used for remaining lengh.
+    template <typename Handler>
     void process_variable_length(
         async_handler_t func,
         buffer buf,
-        std::function<void(std::size_t, buffer, async_handler_t)> handler) {
+        Handler handler) {
         process_variable_length_impl(
             std::move(func),
             std::move(buf),
@@ -8561,10 +8563,11 @@ private:
         );
     }
 
+    template <typename Handler>
     void process_variable_length_impl(
         async_handler_t func,
         buffer buf,
-        std::function<void(std::size_t, buffer, async_handler_t)> handler,
+        Handler handler,
         std::size_t size,
         std::size_t multiplier) {
         if (remaining_length_ == 0) {
@@ -8578,7 +8581,7 @@ private:
             (
                 async_handler_t&& func,
                 buffer&& buf,
-                std::function<void(std::size_t, buffer, async_handler_t)>&& handler,
+                Handler&& handler,
                 std::size_t size,
                 std::size_t multiplier
             ) mutable {
@@ -8639,10 +8642,11 @@ private:
         }
     }
 
+    template <typename Handler>
     void process_packet_id(
         async_handler_t func,
         buffer buf,
-        std::function<void(packet_id_t, buffer, async_handler_t)> handler) {
+        Handler handler) {
         process_fixed_length<sizeof(packet_id_t)>(
             std::move(func),
             std::move(buf),
@@ -8656,10 +8660,11 @@ private:
         );
     }
 
+    template <typename Handler>
     void process_binary(
         async_handler_t func,
         buffer buf,
-        std::function<void(buffer, buffer, async_handler_t)> handler) {
+        Handler handler) {
         if (remaining_length_ < 2) {
             call_message_size_error_handlers(func);
             return;
@@ -8689,10 +8694,11 @@ private:
         );
     }
 
+    template <typename Handler>
     void process_string(
         async_handler_t func,
         buffer buf,
-        std::function<void(buffer, buffer, async_handler_t)> handler) {
+        Handler handler) {
         process_binary(
             std::move(func),
             std::move(buf),
@@ -8709,10 +8715,11 @@ private:
     }
 
 
+    template <typename Handler>
     void process_properties(
         async_handler_t func,
         buffer buf,
-        std::function<void(std::vector<v5::property_variant>, buffer, async_handler_t)> handler) {
+        Handler handler) {
         process_variable_length(
             std::move(func),
             std::move(buf),
@@ -8805,12 +8812,13 @@ private:
         );
     }
 
+    template <typename Handler>
     void process_property_id(
         async_handler_t func,
         buffer buf,
         std::size_t property_length_rest,
         std::vector<v5::property_variant> props,
-        std::function<void(std::vector<v5::property_variant>, buffer, async_handler_t)> handler) {
+        Handler handler) {
 
         if (property_length_rest == 0) {
             handler(std::move(props), std::move(buf), std::move(func));
@@ -8869,13 +8877,14 @@ private:
         }
     }
 
+    template <typename Handler>
     void process_property_body(
         async_handler_t func,
         buffer buf,
         v5::property::id id,
         std::size_t property_length_rest,
         std::vector<v5::property_variant> props,
-        std::function<void(std::vector<v5::property_variant>, buffer, async_handler_t)> handler) {
+        Handler handler) {
 
         static constexpr std::size_t const length_bytes = 2;
 
