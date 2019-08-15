@@ -67,6 +67,279 @@ namespace mqtt {
 namespace as = boost::asio;
 namespace mi = boost::multi_index;
 
+// begin temp move
+    class send_buffer {
+    public:
+        send_buffer():buf_(std::make_shared<std::string>(static_cast<int>(payload_position_), 0)) {}
+
+        std::shared_ptr<std::string> const& buf() const {
+            return buf_;
+        }
+
+        std::shared_ptr<std::string>& buf() {
+            return buf_;
+        }
+
+        std::pair<char*, std::size_t> finalize(std::uint8_t fixed_header) {
+            auto rb = remaining_bytes(buf_->size() - payload_position_);
+            std::size_t start_position = payload_position_ - rb.size() - 1;
+            (*buf_)[start_position] = fixed_header;
+            buf_->replace(start_position + 1, rb.size(), rb);
+            return std::make_pair(
+                &(*buf_)[start_position],
+                buf_->size() - start_position);
+        }
+    private:
+        static constexpr std::size_t const payload_position_ = 5;
+        std::shared_ptr<std::string> buf_;
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct store {
+        using packet_id_t = typename packet_id_type<PacketIdBytes>::type;
+        store(
+            packet_id_t id,
+            std::uint8_t type,
+            basic_store_message_variant<PacketIdBytes> smv,
+            mqtt::any life_keeper = mqtt::any())
+            : packet_id_(id)
+            , expected_control_packet_type_(type)
+            , smv_(std::move(smv))
+            , life_keeper_(std::move(life_keeper)) {}
+        packet_id_t packet_id() const { return packet_id_; }
+        std::uint8_t expected_control_packet_type() const { return expected_control_packet_type_; }
+        basic_message_variant<PacketIdBytes> message() const {
+            return get_basic_message_variant<PacketIdBytes>(smv_);
+        }
+    private:
+        packet_id_t packet_id_;
+        std::uint8_t expected_control_packet_type_;
+        basic_store_message_variant<PacketIdBytes> smv_;
+        mqtt::any life_keeper_;
+    };
+
+    struct tag_packet_id {};
+    struct tag_packet_id_type {};
+    struct tag_seq {};
+    template <std::size_t PacketIdBytes>
+    using mi_store = mi::multi_index_container<
+        store<PacketIdBytes>,
+        mi::indexed_by<
+            mi::ordered_unique<
+                mi::tag<tag_packet_id_type>,
+                mi::composite_key<
+                    store<PacketIdBytes>,
+                    mi::const_mem_fun<
+                        store<PacketIdBytes>, typename packet_id_type<PacketIdBytes>::type,
+                        &store<PacketIdBytes>::packet_id
+                    >,
+                    mi::const_mem_fun<
+                        store<PacketIdBytes>, std::uint8_t,
+                        &store<PacketIdBytes>::expected_control_packet_type
+                    >
+                >
+            >,
+            mi::ordered_non_unique<
+                mi::tag<tag_packet_id>,
+                mi::const_mem_fun<
+                    store<PacketIdBytes>, typename packet_id_type<PacketIdBytes>::type,
+                    &store<PacketIdBytes>::packet_id
+                >
+            >,
+            mi::sequenced<
+                mi::tag<tag_seq>
+            >
+        >
+    >;
+
+    enum class connect_phase {
+        header,
+        properties,
+        client_id,
+        will,
+        user_name,
+        password,
+        finish,
+    };
+
+    struct connect_info {
+        std::size_t header_len;
+        char connect_flag;
+        std::uint16_t keep_alive;
+        std::vector<v5::property_variant> props;
+        buffer client_id;
+        std::vector<v5::property_variant> will_props;
+        buffer will_topic;
+        buffer will_payload;
+        mqtt::optional<buffer> user_name;
+        mqtt::optional<buffer> password;
+    };
+
+    enum class connack_phase {
+        header,
+        properties,
+        finish,
+    };
+
+    struct connack_info {
+        std::size_t header_len;
+        bool session_present;
+        std::uint8_t reason_code;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class publish_phase {
+        topic_name,
+        packet_id,
+        properties,
+        payload,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct publish_info {
+        buffer topic_name;
+        mqtt::optional<typename packet_id_type<PacketIdBytes>::type> packet_id;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class puback_phase {
+        packet_id,
+        reason_code,
+        properties,
+        finish,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct puback_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::uint8_t reason_code;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class pubrec_phase {
+        packet_id,
+        reason_code,
+        properties,
+        finish,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct pubrec_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::uint8_t reason_code;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class pubrel_phase {
+        packet_id,
+        reason_code,
+        properties,
+        finish,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct pubrel_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::uint8_t reason_code;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class pubcomp_phase {
+        packet_id,
+        reason_code,
+        properties,
+        finish,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct pubcomp_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::uint8_t reason_code;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class subscribe_phase {
+        packet_id,
+        properties,
+        topic,
+        finish,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct subscribe_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::vector<v5::property_variant> props;
+        std::vector<std::tuple<buffer, std::uint8_t>> entries;
+    };
+
+    enum class suback_phase {
+        packet_id,
+        properties,
+        reasons,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct suback_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class unsubscribe_phase {
+        packet_id,
+        properties,
+        topic,
+        finish,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct unsubscribe_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::vector<v5::property_variant> props;
+        std::vector<buffer> entries;
+    };
+
+    enum class unsuback_phase {
+        packet_id,
+        properties,
+        reasons,
+    };
+
+    template <std::size_t PacketIdBytes>
+    struct unsuback_info {
+        typename packet_id_type<PacketIdBytes>::type packet_id;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class disconnect_phase {
+        reason_code,
+        properties,
+        finish,
+    };
+
+    struct disconnect_info {
+        std::uint8_t reason_code;
+        std::vector<v5::property_variant> props;
+    };
+
+    enum class auth_phase {
+        reason_code,
+        properties,
+        finish,
+    };
+
+    struct auth_info {
+        std::uint8_t reason_code;
+        std::vector<v5::property_variant> props;
+    };
+
+
+// end temp move
+
+
+namespace detail {
+
+} // namespace detail
+
 template <typename Socket, typename Mutex = std::mutex, template<typename...> class LockGuard = std::lock_guard, std::size_t PacketIdBytes = 2>
 class endpoint : public std::enable_shared_from_this<endpoint<Socket, Mutex, LockGuard, PacketIdBytes>> {
     using this_type = endpoint<Socket, Mutex, LockGuard, PacketIdBytes>;
@@ -7490,7 +7763,7 @@ public:
                 store_.modify(
                     ret.first,
                     [&] (auto& e) {
-                        e = store(
+                        e = store<PacketIdBytes>(
                             packet_id,
                             qos == qos::at_least_once ? control_packet_type::puback
                                                       : control_packet_type::pubrec,
@@ -7524,7 +7797,7 @@ public:
                 store_.modify(
                     ret.first,
                     [&] (auto& e) {
-                        e = store(
+                        e = store<PacketIdBytes>(
                             packet_id,
                             control_packet_type::pubcomp,
                             std::move(msg)
@@ -7603,7 +7876,7 @@ public:
                 store_.modify(
                     ret.first,
                     [&] (auto& e) {
-                        e = store(
+                        e = store<PacketIdBytes>(
                             packet_id,
                             qos == qos::at_least_once ? control_packet_type::puback
                                                       : control_packet_type::pubrec,
@@ -7640,7 +7913,7 @@ public:
                 store_.modify(
                     ret.first,
                     [&] (auto& e) {
-                        e = store(
+                        e = store<PacketIdBytes>(
                             packet_id,
                             control_packet_type::pubcomp,
                             std::move(msg)
@@ -8156,87 +8429,6 @@ private:
         async_send_unsuback(std::vector<std::uint8_t>({qos...}), packet_id, async_handler_t());
     }
 
-    class send_buffer {
-    public:
-        send_buffer():buf_(std::make_shared<std::string>(static_cast<int>(payload_position_), 0)) {}
-
-        std::shared_ptr<std::string> const& buf() const {
-            return buf_;
-        }
-
-        std::shared_ptr<std::string>& buf() {
-            return buf_;
-        }
-
-        std::pair<char*, std::size_t> finalize(std::uint8_t fixed_header) {
-            auto rb = remaining_bytes(buf_->size() - payload_position_);
-            std::size_t start_position = payload_position_ - rb.size() - 1;
-            (*buf_)[start_position] = fixed_header;
-            buf_->replace(start_position + 1, rb.size(), rb);
-            return std::make_pair(
-                &(*buf_)[start_position],
-                buf_->size() - start_position);
-        }
-    private:
-        static constexpr std::size_t const payload_position_ = 5;
-        std::shared_ptr<std::string> buf_;
-    };
-
-    struct store {
-        store(
-            packet_id_t id,
-            std::uint8_t type,
-            basic_store_message_variant<PacketIdBytes> smv,
-            mqtt::any life_keeper = mqtt::any())
-            : packet_id_(id)
-            , expected_control_packet_type_(type)
-            , smv_(std::move(smv))
-            , life_keeper_(std::move(life_keeper)) {}
-        packet_id_t packet_id() const { return packet_id_; }
-        std::uint8_t expected_control_packet_type() const { return expected_control_packet_type_; }
-        basic_message_variant<PacketIdBytes> message() const {
-            return get_basic_message_variant<PacketIdBytes>(smv_);
-        }
-    private:
-        packet_id_t packet_id_;
-        std::uint8_t expected_control_packet_type_;
-        basic_store_message_variant<PacketIdBytes> smv_;
-        mqtt::any life_keeper_;
-    };
-
-    struct tag_packet_id {};
-    struct tag_packet_id_type {};
-    struct tag_seq {};
-    using mi_store = mi::multi_index_container<
-        store,
-        mi::indexed_by<
-            mi::ordered_unique<
-                mi::tag<tag_packet_id_type>,
-                mi::composite_key<
-                    store,
-                    mi::const_mem_fun<
-                        store, packet_id_t,
-                        &store::packet_id
-                    >,
-                    mi::const_mem_fun<
-                        store, std::uint8_t,
-                        &store::expected_control_packet_type
-                    >
-                >
-            >,
-            mi::ordered_non_unique<
-                mi::tag<tag_packet_id>,
-                mi::const_mem_fun<
-                    store, packet_id_t,
-                    &store::packet_id
-                >
-            >,
-            mi::sequenced<
-                mi::tag<tag_seq>
-            >
-        >
-    >;
-
     void handle_control_packet_type(async_handler_t func) {
         fixed_header_ = static_cast<std::uint8_t>(buf_[0]);
         remaining_length_ = 0;
@@ -8356,7 +8548,7 @@ private:
     }
 
     void process_payload(async_handler_t func) {
-
+#if 1
         auto control_packet_type = get_control_packet_type(fixed_header_);
         switch (control_packet_type) {
         case control_packet_type::connect:
@@ -8429,6 +8621,7 @@ private:
         default:
             break;
         }
+#endif
     }
 
     // primitive read functions
@@ -9769,29 +9962,6 @@ private:
 
     // process connect
 
-    enum class connect_phase {
-        header,
-        properties,
-        client_id,
-        will,
-        user_name,
-        password,
-        finish,
-    };
-
-    struct connect_info {
-        std::size_t header_len;
-        char connect_flag;
-        std::uint16_t keep_alive;
-        std::vector<v5::property_variant> props;
-        buffer client_id;
-        std::vector<v5::property_variant> will_props;
-        buffer will_topic;
-        buffer will_payload;
-        mqtt::optional<buffer> user_name;
-        mqtt::optional<buffer> password;
-    };
-
     void process_connect(
         async_handler_t func,
         bool all_read
@@ -10123,19 +10293,6 @@ private:
 
     // process connack
 
-    enum class connack_phase {
-        header,
-        properties,
-        finish,
-    };
-
-    struct connack_info {
-        std::size_t header_len;
-        bool session_present;
-        std::uint8_t reason_code;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_connack(
         async_handler_t func,
         bool all_read
@@ -10281,19 +10438,6 @@ private:
 
     // process publish
 
-    enum class publish_phase {
-        topic_name,
-        packet_id,
-        properties,
-        payload,
-    };
-
-    struct publish_info {
-        buffer topic_name;
-        mqtt::optional<packet_id_t> packet_id;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_publish(
         async_handler_t func,
         bool all_read
@@ -10312,7 +10456,7 @@ private:
             0,
             &this_type::process_publish_impl,
             publish_phase::topic_name,
-            publish_info()
+            publish_info<PacketIdBytes>()
         );
     }
 
@@ -10320,7 +10464,7 @@ private:
         async_handler_t func,
         buffer buf,
         publish_phase phase,
-        publish_info&& info
+        publish_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case publish_phase::topic_name:
@@ -10502,19 +10646,6 @@ private:
 
     // process puback
 
-    enum class puback_phase {
-        packet_id,
-        reason_code,
-        properties,
-        finish,
-    };
-
-    struct puback_info {
-        packet_id_t packet_id;
-        std::uint8_t reason_code;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_puback(
         async_handler_t func,
         bool all_read
@@ -10527,7 +10658,7 @@ private:
             return;
         }
 
-        puback_info info;
+        puback_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -10542,7 +10673,7 @@ private:
         async_handler_t func,
         buffer buf,
         puback_phase phase,
-        puback_info&& info = puback_info()
+        puback_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case puback_phase::packet_id:
@@ -10647,19 +10778,6 @@ private:
 
     // process pubrec
 
-    enum class pubrec_phase {
-        packet_id,
-        reason_code,
-        properties,
-        finish,
-    };
-
-    struct pubrec_info {
-        packet_id_t packet_id;
-        std::uint8_t reason_code;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_pubrec(
         async_handler_t func,
         bool all_read
@@ -10672,7 +10790,7 @@ private:
             return;
         }
 
-        pubrec_info info;
+        pubrec_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -10687,7 +10805,7 @@ private:
         async_handler_t func,
         buffer buf,
         pubrec_phase phase,
-        pubrec_info&& info = pubrec_info()
+        pubrec_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case pubrec_phase::packet_id:
@@ -10820,19 +10938,6 @@ private:
 
     // process pubrel
 
-    enum class pubrel_phase {
-        packet_id,
-        reason_code,
-        properties,
-        finish,
-    };
-
-    struct pubrel_info {
-        packet_id_t packet_id;
-        std::uint8_t reason_code;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_pubrel(
         async_handler_t func,
         bool all_read
@@ -10845,7 +10950,7 @@ private:
             return;
         }
 
-        pubrel_info info;
+        pubrel_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -10860,7 +10965,7 @@ private:
         async_handler_t func,
         buffer buf,
         pubrel_phase phase,
-        pubrel_info&& info = pubrel_info()
+        pubrel_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case pubrel_phase::packet_id:
@@ -10980,19 +11085,6 @@ private:
 
     // process pubcomp
 
-    enum class pubcomp_phase {
-        packet_id,
-        reason_code,
-        properties,
-        finish,
-    };
-
-    struct pubcomp_info {
-        packet_id_t packet_id;
-        std::uint8_t reason_code;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_pubcomp(
         async_handler_t func,
         bool all_read
@@ -11005,7 +11097,7 @@ private:
             return;
         }
 
-        pubcomp_info info;
+        pubcomp_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -11020,7 +11112,7 @@ private:
         async_handler_t func,
         buffer buf,
         pubcomp_phase phase,
-        pubcomp_info&& info = pubcomp_info()
+        pubcomp_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case pubcomp_phase::packet_id:
@@ -11126,19 +11218,6 @@ private:
 
     // process subscribe
 
-    enum class subscribe_phase {
-        packet_id,
-        properties,
-        topic,
-        finish,
-    };
-
-    struct subscribe_info {
-        packet_id_t packet_id;
-        std::vector<v5::property_variant> props;
-        std::vector<std::tuple<buffer, std::uint8_t>> entries;
-    };
-
     void process_subscribe(
         async_handler_t func,
         bool all_read
@@ -11151,7 +11230,7 @@ private:
             return;
         }
 
-        subscribe_info info;
+        subscribe_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -11166,7 +11245,7 @@ private:
         async_handler_t func,
         buffer buf,
         subscribe_phase phase,
-        subscribe_info&& info = subscribe_info()
+        subscribe_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case subscribe_phase::packet_id:
@@ -11286,17 +11365,6 @@ private:
 
     // process suback
 
-    enum class suback_phase {
-        packet_id,
-        properties,
-        reasons,
-    };
-
-    struct suback_info {
-        packet_id_t packet_id;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_suback(
         async_handler_t func,
         bool all_read
@@ -11309,7 +11377,7 @@ private:
             return;
         }
 
-        suback_info info;
+        suback_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -11324,7 +11392,7 @@ private:
         async_handler_t func,
         buffer buf,
         suback_phase phase,
-        suback_info&& info = suback_info()
+        suback_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case suback_phase::packet_id:
@@ -11440,19 +11508,6 @@ private:
 
     // process unsubscribe
 
-    enum class unsubscribe_phase {
-        packet_id,
-        properties,
-        topic,
-        finish,
-    };
-
-    struct unsubscribe_info {
-        packet_id_t packet_id;
-        std::vector<v5::property_variant> props;
-        std::vector<buffer> entries;
-    };
-
     void process_unsubscribe(
         async_handler_t func,
         bool all_read
@@ -11465,7 +11520,7 @@ private:
             return;
         }
 
-        unsubscribe_info info;
+        unsubscribe_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -11480,7 +11535,7 @@ private:
         async_handler_t func,
         buffer buf,
         unsubscribe_phase phase,
-        unsubscribe_info&& info = unsubscribe_info()
+        unsubscribe_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case unsubscribe_phase::packet_id:
@@ -11580,17 +11635,6 @@ private:
 
     // process unsuback
 
-    enum class unsuback_phase {
-        packet_id,
-        properties,
-        reasons,
-    };
-
-    struct unsuback_info {
-        packet_id_t packet_id;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_unsuback(
         async_handler_t func,
         bool all_read
@@ -11603,7 +11647,7 @@ private:
             return;
         }
 
-        unsuback_info info;
+        unsuback_info<PacketIdBytes> info;
         process_header(
             std::move(func),
             all_read,
@@ -11618,7 +11662,7 @@ private:
         async_handler_t func,
         buffer buf,
         unsuback_phase phase,
-        unsuback_info&& info = unsuback_info()
+        unsuback_info<PacketIdBytes>&& info
     ) {
         switch (phase) {
         case unsuback_phase::packet_id:
@@ -11753,17 +11797,6 @@ private:
 
     // process disconnect
 
-    enum class disconnect_phase {
-        reason_code,
-        properties,
-        finish,
-    };
-
-    struct disconnect_info {
-        std::uint8_t reason_code;
-        std::vector<v5::property_variant> props;
-    };
-
     void process_disconnect(
         async_handler_t func,
         bool all_read
@@ -11871,17 +11904,6 @@ private:
     }
 
     // process auth
-
-    enum class auth_phase {
-        reason_code,
-        properties,
-        finish,
-    };
-
-    struct auth_info {
-        std::uint8_t reason_code;
-        std::vector<v5::property_variant> props;
-    };
 
     void process_auth(
         async_handler_t func,
@@ -12775,7 +12797,7 @@ private:
                         store_.modify(
                             ret.first,
                             [&] (auto& e) {
-                                e = store(
+                                e = store<PacketIdBytes>(
                                     packet_id,
                                     control_packet_type::pubcomp,
                                     std::move(msg),
@@ -13455,7 +13477,7 @@ private:
     pre_send_handler h_pre_send_;
     is_valid_length_handler h_is_valid_length_;
     Mutex store_mtx_;
-    mi_store store_;
+    mi_store<PacketIdBytes> store_;
     std::set<packet_id_t> qos2_publish_handled_;
     std::deque<async_packet> queue_;
     packet_id_t packet_id_master_{0};
