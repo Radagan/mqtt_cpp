@@ -470,9 +470,7 @@ public:
         auto it = eps.begin();
         auto end = eps.end();
 #endif // BOOST_VERSION < 106600
-
-        socket_ = std::make_shared<Socket>(ios_);
-        base::socket_optional().emplace(socket_);
+        setup_socket(socket_);
         connect_impl(*socket_, it, end, std::move(props), std::move(func));
     }
 
@@ -774,6 +772,36 @@ protected:
     }
 
 private:
+    template <typename Strand>
+    void setup_socket(std::shared_ptr<tcp_endpoint<as::ip::tcp::socket, Strand>>& socket) {
+        socket = std::make_shared<Socket>(ios_);
+        base::socket_optional().emplace(socket);
+    }
+
+#if defined(MQTT_USE_WS)
+    template <typename Strand>
+    void setup_socket(std::shared_ptr<ws_endpoint<as::ip::tcp::socket, Strand>>& socket) {
+        socket = std::make_shared<Socket>(ios_);
+        base::socket_optional().emplace(socket);
+    }
+#endif // defined(MQTT_USE_WS)
+
+#if !defined(MQTT_NO_TLS)
+    template <typename Strand>
+    void setup_socket(std::shared_ptr<tcp_endpoint<as::ssl::stream<as::ip::tcp::socket>, Strand>>& socket) {
+        socket = std::make_shared<Socket>(ios_, ctx_);
+        base::socket_optional().emplace(socket);
+    }
+
+#if defined(MQTT_USE_WS)
+    template <typename Strand>
+    void setup_socket(std::shared_ptr<ws_endpoint<as::ssl::stream<as::ip::tcp::socket>, Strand>>& socket) {
+        socket = std::make_shared<Socket>(ios_, ctx_);
+        base::socket_optional().emplace(socket);
+    }
+#endif // defined(MQTT_USE_WS)
+
+#endif // !defined(MQTT_NO_TLS)
 
     template <typename Strand>
     void handshake_socket(
