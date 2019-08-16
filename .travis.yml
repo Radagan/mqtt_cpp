@@ -47,18 +47,8 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-#            - ubuntu-toolchain-r-test
-#            - llvm-toolchain-trusty-5.0
-#            - llvm-toolchain-trusty
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-#            - clang-7.0
-#            - libc6-dbg
             - clang-8
             - boost1.67
     - os: linux
@@ -69,19 +59,8 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-#            - ubuntu-toolchain-r-test
-#            - llvm-toolchain-trusty-5.0
-#            - llvm-toolchain-trusty
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - openssl
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-##            - clang-5.0
-#            - libc6-dbg
             - clang-8
             - boost1.67
     - os: linux
@@ -92,19 +71,8 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-#            - ubuntu-toolchain-r-test
-#            - llvm-toolchain-trusty-5.0
-#            - llvm-toolchain-trusty
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - openssl
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-#            - clang-5.0
-#            - libc6-dbg
             - clang-8
             - boost1.67
     - os: linux
@@ -115,20 +83,8 @@ matrix:
         apt:
           sources:
             - sourceline: 'ppa:ubuntu-toolchain-r/test'
-#            - ubuntu-toolchain-r-test
-#            - llvm-toolchain-trusty-5.0
-#            - llvm-toolchain-trusty
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-#            - openssl
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-#            - clang-5.0
-#            - libc6-dbg
             - clang-8
             - boost1.67
     - os: linux
@@ -142,12 +98,6 @@ matrix:
           packages:
             - lcov
             - g++-9
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-#            - libc6-dbg
             - boost1.67
     - os: linux
       compiler: gcc
@@ -160,12 +110,6 @@ matrix:
           packages:
             - lcov
             - g++-9
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-#            - libc6-dbg
             - boost1.67
     - os: linux
       compiler: gcc
@@ -178,12 +122,6 @@ matrix:
           packages:
             - lcov
             - g++-9
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-#            - libc6-dbg
             - boost1.67
     - os: linux
       sudo: required
@@ -197,13 +135,6 @@ matrix:
           packages:
             - lcov
             - g++-9
-#            - openssl
-#            - g++-multilib
-#            - gcc-multilib
-#            - gcc-7-multilib
-#            - g++-7-multilib
-#            - bzip2
-#            - libc6-dbg
             - boost1.67
 
 script:
