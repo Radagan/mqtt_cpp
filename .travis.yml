@@ -59,7 +59,7 @@ matrix:
 #            - bzip2
 #            - clang-7.0
 #            - libc6-dbg
-            - clang++-8
+            - clang-8
             - boost1.67
     - os: linux
       sudo: required
@@ -82,7 +82,7 @@ matrix:
 #            - bzip2
 ##            - clang-5.0
 #            - libc6-dbg
-            - clang++-8
+            - clang-8
             - boost1.67
     - os: linux
       sudo: required
@@ -105,7 +105,7 @@ matrix:
 #            - bzip2
 #            - clang-5.0
 #            - libc6-dbg
-            - clang++-8
+            - clang-8
             - boost1.67
     - os: linux
       sudo: required
@@ -129,7 +129,7 @@ matrix:
 #            - bzip2
 #            - clang-5.0
 #            - libc6-dbg
-            - clang++-8
+            - clang-8
             - boost1.67
     - os: linux
       compiler: gcc
