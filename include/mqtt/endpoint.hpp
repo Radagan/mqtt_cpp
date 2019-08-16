@@ -31,9 +31,6 @@
 #include <boost/multi_index/composite_key.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/assert.hpp>
-#include <boost/type_erasure/any.hpp>
-#include <boost/type_erasure/member.hpp>
-#include <boost/type_erasure/relaxed.hpp>
 
 #include <mqtt/any.hpp>
 #include <mqtt/fixed_header.hpp>
@@ -60,6 +57,7 @@
 #include <mqtt/subscribe.hpp>
 #include <mqtt/buffer.hpp>
 #include <mqtt/shared_ptr_array.hpp>
+#include <mqtt/type_erased_socket.hpp>
 
 #if defined(MQTT_USE_WS)
 #include <mqtt/ws_endpoint.hpp>
@@ -69,44 +67,6 @@ namespace mqtt {
 
 namespace as = boost::asio;
 namespace mi = boost::multi_index;
-namespace mpl = boost::mpl;
-
-// type erased socket
-
-template <typename Concept>
-class shared_any : public boost::type_erasure::any<Concept, boost::type_erasure::_self&> {
-    using base_type = boost::type_erasure::any<Concept, boost::type_erasure::_self&>;
-    std::shared_ptr<void> ownership_;
-public:
-    template <class U>
-    shared_any(std::shared_ptr<U> p)
-        : base_type(*p), ownership_(p) {}
-
-    void const* get_address() const {
-        return ownership_.get();
-    }
-};
-
-BOOST_TYPE_ERASURE_MEMBER(has_async_read, async_read)
-BOOST_TYPE_ERASURE_MEMBER(has_async_write, async_write)
-BOOST_TYPE_ERASURE_MEMBER(has_write, write)
-BOOST_TYPE_ERASURE_MEMBER(has_post, post)
-BOOST_TYPE_ERASURE_MEMBER(has_lowest_layer, lowest_layer)
-BOOST_TYPE_ERASURE_MEMBER(has_close, close)
-
-using namespace boost::type_erasure;
-
-using socket = shared_any<
-    mpl::vector<
-        destructible<>,
-        has_async_read<void(as::mutable_buffer, std::function<void(boost::system::error_code const&, std::size_t)>)>,
-        has_async_write<void(std::vector<as::const_buffer>, std::function<void(boost::system::error_code const&, std::size_t)>)>,
-        has_write<std::size_t(std::vector<as::const_buffer>, boost::system::error_code&)>,
-        has_post<void(std::function<void()>)>,
-        has_lowest_layer<as::basic_socket<as::ip::tcp>&()>,
-        has_close<void(boost::system::error_code&)>
-    >
->;
 
 template <typename Mutex = std::mutex, template<typename...> class LockGuard = std::lock_guard, std::size_t PacketIdBytes = 2>
 class endpoint : public std::enable_shared_from_this<endpoint<Mutex, LockGuard, PacketIdBytes>> {
