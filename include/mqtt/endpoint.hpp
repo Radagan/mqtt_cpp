@@ -7468,7 +7468,7 @@ public:
         case control_packet_type::publish: {
             auto size = static_cast<std::size_t>(std::distance(b, e));
             shared_ptr_array spa { new char[size] };
-            std::copy(b, e, &spa[0]);
+            std::copy(b, e, spa.get());
             restore_serialized_message(
                 basic_publish_message<PacketIdBytes>(
                     buffer(spa.get(), size)
@@ -7577,7 +7577,7 @@ public:
         case control_packet_type::publish: {
             auto size = static_cast<std::size_t>(std::distance(b, e));
             shared_ptr_array spa { new char[size] };
-            std::copy(b, e, &spa[0]);
+            std::copy(b, e, spa.get());
             restore_v5_serialized_message(
                 v5::basic_publish_message<PacketIdBytes>(
                     buffer(spa.get(), size)
@@ -7588,7 +7588,7 @@ public:
         case control_packet_type::pubrel: {
             auto size = static_cast<std::size_t>(std::distance(b, e));
             shared_ptr_array spa { new char[size] };
-            std::copy(b, e, &spa[0]);
+            std::copy(b, e, spa.get());
             restore_v5_serialized_message(
                 v5::basic_pubrel_message<PacketIdBytes>(
                     buffer(spa.get(), size)
